@@ -3,12 +3,14 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <unistd.h>
+#include <cerrno>
 
 using namespace std;
 
 void print_registers(pid_t child)
 {
     user_regs_struct regs;
+
     if (ptrace(PTRACE_GETREGS, child, nullptr, &regs) == -1)
     {
         perror("ptrace getregs");
@@ -23,6 +25,21 @@ void print_registers(pid_t child)
     cout << "RAX: 0x" << regs.rax << '\n';
 
     cout << dec;
+}
+
+long read_memory(pid_t child, unsigned long address)
+{
+    errno = 0;
+
+    long data = ptrace(PTRACE_PEEKDATA, child, address, nullptr);
+
+    if (data == -1 && errno != 0)
+    {
+        perror("ptrace peekdata");
+        return -1;
+    }
+
+    return data;
 }
 
 int main()
@@ -58,8 +75,20 @@ int main()
         return 1;
     }
 
+    cout << "Child stopped\n";
     cout << "Initial registers:\n";
     print_registers(child);
+
+    user_regs_struct regs;
+    if (ptrace(PTRACE_GETREGS, child, nullptr, &regs) == -1)
+    {
+        perror("ptrace getregs");
+        return 1;
+    }
+
+    long data = read_memory(child, regs.rip);
+
+    cout << "Memory at RIP: 0x" << hex << data << dec << '\n';
 
     if (ptrace(PTRACE_SINGLESTEP, child, nullptr, nullptr) == -1)
     {
