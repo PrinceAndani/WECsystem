@@ -1,118 +1,59 @@
+#include "debugger.hpp"
+
+#include <cstdint>
 #include <iostream>
-#include <sys/ptrace.h>
-#include <sys/wait.h>
-#include <sys/user.h>
-#include <unistd.h>
-#include <cerrno>
+#include <sstream>
+#include <string>
 
 using namespace std;
 
-void print_registers(pid_t child)
-{
-    user_regs_struct regs;
+int main() {
+    Debugger debugger;
+    string line;
 
-    if (ptrace(PTRACE_GETREGS, child, nullptr, &regs) == -1)
-    {
-        perror("ptrace getregs");
-        return;
-    }
-
-    cout << hex;
-
-    cout << "RIP: 0x" << regs.rip << '\n';
-    cout << "RSP: 0x" << regs.rsp << '\n';
-    cout << "RBP: 0x" << regs.rbp << '\n';
-    cout << "RAX: 0x" << regs.rax << '\n';
-
-    cout << dec;
-}
-
-long read_memory(pid_t child, unsigned long address)
-{
-    errno = 0;
-
-    long data = ptrace(PTRACE_PEEKDATA, child, address, nullptr);
-
-    if (data == -1 && errno != 0)
-    {
-        perror("ptrace peekdata");
-        return -1;
-    }
-
-    return data;
-}
-
-int main()
-{
-    pid_t child = fork();
-
-    if (child == -1)
-    {
-        perror("fork");
-        return 1;
-    }
-
-    if (child == 0)
-    {
-        if (ptrace(PTRACE_TRACEME, 0, nullptr, nullptr) == -1)
-        {
-            perror("ptrace");
-            return 1;
+    while (true) {
+        cout << "debugger> ";
+        if (!getline(cin, line)) {
+            break;
         }
 
-        execl("./tests/test_program", "./tests/test_program", nullptr);
+        stringstream input(line);
+        string command;
+        input >> command;
 
-        perror("execl");
-        return 1;
-    }
-
-    int status;
-    waitpid(child, &status, 0);
-
-    if (!WIFSTOPPED(status))
-    {
-        cerr << "Child did not stop correctly\n";
-        return 1;
-    }
-
-    cout << "Child stopped\n";
-    cout << "Initial registers:\n";
-    print_registers(child);
-
-    user_regs_struct regs;
-    if (ptrace(PTRACE_GETREGS, child, nullptr, &regs) == -1)
-    {
-        perror("ptrace getregs");
-        return 1;
-    }
-
-    long data = read_memory(child, regs.rip);
-
-    cout << "Memory at RIP: 0x" << hex << data << dec << '\n';
-
-    if (ptrace(PTRACE_SINGLESTEP, child, nullptr, nullptr) == -1)
-    {
-        perror("ptrace single step");
-        return 1;
-    }
-
-    waitpid(child, &status, 0);
-
-    cout << "\nAfter one instruction:\n";
-    print_registers(child);
-
-    if (ptrace(PTRACE_CONT, child, nullptr, nullptr) == -1)
-    {
-        perror("ptrace continue");
-        return 1;
-    }
-
-    waitpid(child, &status, 0);
-
-    if (WIFEXITED(status))
-    {
-        cout << "\nChild exited with code: "
-             << WEXITSTATUS(status) << '\n';
+        if (command == "run") {
+            string program;
+            input >> program;
+            debugger.run(program);
+        } else if (command == "attach") {
+            pid_t pid;
+            input >> pid;
+            debugger.attach(pid);
+        } else if (command == "step") {
+            debugger.step();
+        } else if (command == "continue") {
+            debugger.continue_execution();
+        } else if (command == "break") {
+            string value;
+            input >> value;
+            uintptr_t address = stoull(value, nullptr, 16);
+            debugger.set_breakpoint(address);
+        } else if (command == "delete") {
+            string value;
+            input >> value;
+            uintptr_t address = stoull(value, nullptr, 16);
+            debugger.delete_breakpoint(address);
+        } else if (command == "registers") {
+            debugger.print_registers();
+        } else if (command == "memory") {
+            string address_text;
+            int count;
+            input >> address_text >> count;
+            uintptr_t address = stoull(address_text, nullptr, 16);
+            debugger.print_memory(address, count);
+        } else if (command == "quit") {
+            break;
+        }
     }
 
     return 0;

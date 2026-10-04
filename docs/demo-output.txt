@@ -1,0 +1,48 @@
+Successful basic demonstration (Linux x86-64)
+
+$ nm -n build/test_program | grep ' main$'
+0000000000401156 T main
+
+$ ./build/debugger
+
+debugger> run ./build/test_program
+Program stopped by signal 5
+Started process with pid 2469
+
+debugger> break 401156
+Breakpoint set at 0x401156
+
+debugger> continue
+Program stopped by signal 5
+
+debugger> registers
+RIP = 0x401157
+RSP = 0x7ffeb2be6428
+RBP = 0x1
+RAX = 0x401156
+RBX = 0x7ffeb2be6538
+RCX = 0x403df0
+RDX = 0x7ffeb2be6548
+RSI = 0x7ffeb2be6538
+RDI = 0x1
+
+debugger> step
+Program stopped by signal 5
+
+debugger> registers
+RIP = 0x40115a
+RSP = 0x7ffeb2be6420
+RBP = 0x7ffeb2be6420
+RAX = 0x401156
+RBX = 0x7ffeb2be6538
+RCX = 0x403df0
+RDX = 0x7ffeb2be6548
+RSI = 0x7ffeb2be6538
+RDI = 0x1
+
+debugger> delete 401156
+Breakpoint deleted
+
+debugger> continue
+x = 11
+Program exited with code 0
